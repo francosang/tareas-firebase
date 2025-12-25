@@ -25,14 +25,22 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /todos/{todoId} {
-      allow read, write: if request.auth != null 
+      // Lectura: solo si el documento pertenece al usuario
+      allow read: if request.auth != null 
         && resource.data.userId == request.auth.uid;
+      
+      // Crear: solo si el userId del nuevo documento coincide con el usuario autenticado
       allow create: if request.auth != null 
         && request.resource.data.userId == request.auth.uid;
+      
+      // Actualizar y eliminar: solo si el documento pertenece al usuario
+      allow update, delete: if request.auth != null 
+        && resource.data.userId == request.auth.uid;
     }
   }
 }
 ```
+3. Haz clic en **Publish**
 
 ### 4. Construir y desplegar
 
