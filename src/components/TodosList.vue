@@ -1,11 +1,23 @@
 <script setup>
 import { ref, computed } from "vue";
-import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, query, where } from "firebase/firestore";
 import { useCollection } from "vuefire";
 import { firebaseApp } from "@/main";
 
+const props = defineProps({
+  user: {
+    type: Object,
+    required: true
+  }
+});
+
 const db = getFirestore(firebaseApp);
-const todos = useCollection(collection(db, "todos"));
+// Filtrar todos solo para el usuario actual
+const todosQuery = query(
+  collection(db, "todos"),
+  where("userId", "==", props.user.uid)
+);
+const todos = useCollection(todosQuery);
 
 const newTodoTitle = ref("");
 const filterType = ref("all"); // all, active, completed
@@ -45,7 +57,8 @@ const addTodo = async () => {
     await addDoc(collection(db, "todos"), {
       title: newTodoTitle.value,
       completed: false,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      userId: props.user.uid
     });
     newTodoTitle.value = "";
   }
