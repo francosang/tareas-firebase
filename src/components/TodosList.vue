@@ -1,8 +1,12 @@
 <script setup>
 import { ref, computed } from "vue";
-import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, query, where } from "firebase/firestore";
 import { useCollection } from "vuefire";
-import { firebaseApp } from "@/main";
+import { 
+  getTodosQuery,
+  addTodo as addTodoToDb,
+  toggleTodoComplete as toggleTodoInDb,
+  deleteTodo as deleteTodoFromDb
+} from "@/data";
 
 const props = defineProps({
   user: {
@@ -11,13 +15,9 @@ const props = defineProps({
   }
 });
 
-const db = getFirestore(firebaseApp);
-// Filtrar todos solo para el usuario actual
-const todosQuery = query(
-  collection(db, "tareas"),
-  where("userId", "==", props.user.uid)
-);
-const todos = useCollection(todosQuery);
+// Get todos query for the current user
+const todosQuery = getTodosQuery(props.user.uid);
+const { data: todos, pending: loading } = useCollection(todosQuery);
 
 const newTodoTitle = ref("");
 const filterType = ref("all"); // all, active, completed
@@ -54,26 +54,32 @@ const stats = computed(() => {
 
 const addTodo = async () => {
   if (newTodoTitle.value.trim()) {
-    await addDoc(collection(db, "tareas"), {
-      title: newTodoTitle.value,
-      completed: false,
-      createdAt: new Date().toISOString(),
-      userId: props.user.uid
-    });
-    newTodoTitle.value = "";
+    try {
+      await addTodoToDb({
+        title: newTodoTitle.value,
+        userId: props.user.uid
+      });
+      newTodoTitle.value = "";
+    } catch (error) {
+      console.error('Error adding todo:', error);
+    }
   }
 };
 
 const toggleTodo = async (todo) => {
-  const todoRef = doc(db, "tareas", todo.id);
-  await updateDoc(todoRef, {
-    completed: !todo.completed
-  });
+  try {
+    await toggleTodoInDb(todo.id, todo.completed);
+  } catch (error) {
+    console.error('Error toggling todo:', error);
+  }
 };
 
 const deleteTodo = async (todoId) => {
-  const todoRef = doc(db, "tareas", todoId);
-  await deleteDoc(todoRef);
+  try {
+    await deleteTodoFromDb(todoId);
+  } catch (error) {
+    console.error('Error deleting todo:', error);
+  }
 };
 
 const handleKeyPress = (event) => {
@@ -87,18 +93,37 @@ const handleKeyPress = (event) => {
   <div class="todos-wrapper">
     <!-- Stats Section -->
     <div class="stats-card">
-      <div class="stat">
-        <span class="stat-value">{{ stats.total }}</span>
-        <span class="stat-label">Total</span>
-      </div>
-      <div class="stat">
-        <span class="stat-value">{{ stats.active }}</span>
-        <span class="stat-label">Activas</span>
-      </div>
-      <div class="stat">
-        <span class="stat-value">{{ stats.completed }}</span>
-        <span class="stat-label">Completadas</span>
-      </div>
+      <!-- Loading State for Stats -->
+      <template v-if="loading">
+        <div class="stat stat-loading">
+          <div class="stat-skeleton"></div>
+          <span class="stat-label">Total</span>
+        </div>
+        <div class="stat stat-loading">
+          <div class="stat-skeleton"></div>
+          <span class="stat-label">Activas</span>
+        </div>
+        <div class="stat stat-loading">
+          <div class="stat-skeleton"></div>
+          <span class="stat-label">Completadas</span>
+        </div>
+      </template>
+      
+      <!-- Stats Data -->
+      <template v-else>
+        <div class="stat">
+          <span class="stat-value">{{ stats.total }}</span>
+          <span class="stat-label">Total</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">{{ stats.active }}</span>
+          <span class="stat-label">Activas</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">{{ stats.completed }}</span>
+          <span class="stat-label">Completadas</span>
+        </div>
+      </template>
     </div>
 
     <!-- Add Todo Section -->
@@ -142,7 +167,14 @@ const handleKeyPress = (event) => {
 
     <!-- Todos List -->
     <div class="todos-container">
-      <div v-if="!filteredTodos || filteredTodos.length === 0" class="empty-state">
+      <!-- Loading State -->
+      <div v-if="loading" class="loading-state">
+        <div class="spinner"></div>
+        <p class="loading-text">Cargando tus tareas...</p>
+      </div>
+
+      <!-- Empty State -->
+      <div v-else-if="!filteredTodos || filteredTodos.length === 0" class="empty-state">
         <div class="empty-icon">{{ filterType === 'completed' ? '🎉' : '📋' }}</div>
         <p class="empty-text">
           {{ filterType === 'completed' ? '¡Aún no hay tareas completadas!' : '¡No hay tareas! Agrega una arriba.' }}
@@ -215,6 +247,26 @@ const handleKeyPress = (event) => {
   color: #666;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* Stats Loading State */
+.stat-loading {
+  pointer-events: none;
+}
+
+.stat-skeleton {
+  width: 80px;
+  height: 3rem;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+  margin: 0 auto 0.5rem;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* Add Todo Card */
@@ -417,6 +469,32 @@ const handleKeyPress = (event) => {
 .empty-text {
   color: #999;
   font-size: 1.1rem;
+}
+
+/* Loading State */
+.loading-state {
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f0f0f0;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1.5rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  color: #999;
+  font-size: 1.1rem;
+  font-weight: 500;
 }
 
 /* Responsive */

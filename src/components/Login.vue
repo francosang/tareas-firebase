@@ -1,10 +1,7 @@
 <script setup>
 import { ref } from "vue";
-import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { firebaseApp } from "@/main";
+import { signInWithGoogle as signIn } from "@/data";
 
-const auth = getAuth(firebaseApp);
-const provider = new GoogleAuthProvider();
 const loading = ref(false);
 const error = ref("");
 
@@ -13,10 +10,10 @@ const signInWithGoogle = async () => {
   error.value = "";
   
   try {
-    await signInWithPopup(auth, provider);
+    await signIn();
   } catch (err) {
     console.error("Error al iniciar sesión:", err);
-    error.value = "Error al iniciar sesión. Por favor, intenta de nuevo.";
+    error.value = err.message || "Error al iniciar sesión. Por favor, intenta de nuevo.";
   } finally {
     loading.value = false;
   }

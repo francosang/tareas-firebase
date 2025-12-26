@@ -1,16 +1,14 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { firebaseApp } from './main';
+import { onAuthChange, signOut } from '@/data';
 import TodosList from './components/TodosList.vue';
 import Login from './components/Login.vue';
 
-const auth = getAuth(firebaseApp);
 const user = ref(null);
 const loading = ref(true);
 
 onMounted(() => {
-  onAuthStateChanged(auth, (currentUser) => {
+  onAuthChange((currentUser) => {
     user.value = currentUser;
     loading.value = false;
   });
@@ -18,7 +16,7 @@ onMounted(() => {
 
 const handleSignOut = async () => {
   try {
-    await signOut(auth);
+    await signOut();
   } catch (error) {
     console.error('Error al cerrar sesión:', error);
   }
