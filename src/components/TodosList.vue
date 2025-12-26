@@ -14,7 +14,7 @@ const props = defineProps({
 const db = getFirestore(firebaseApp);
 // Filtrar todos solo para el usuario actual
 const todosQuery = query(
-  collection(db, "todos"),
+  collection(db, "tareas"),
   where("userId", "==", props.user.uid)
 );
 const todos = useCollection(todosQuery);
@@ -54,7 +54,7 @@ const stats = computed(() => {
 
 const addTodo = async () => {
   if (newTodoTitle.value.trim()) {
-    await addDoc(collection(db, "todos"), {
+    await addDoc(collection(db, "tareas"), {
       title: newTodoTitle.value,
       completed: false,
       createdAt: new Date().toISOString(),
@@ -65,14 +65,14 @@ const addTodo = async () => {
 };
 
 const toggleTodo = async (todo) => {
-  const todoRef = doc(db, "todos", todo.id);
+  const todoRef = doc(db, "tareas", todo.id);
   await updateDoc(todoRef, {
     completed: !todo.completed
   });
 };
 
 const deleteTodo = async (todoId) => {
-  const todoRef = doc(db, "todos", todoId);
+  const todoRef = doc(db, "tareas", todoId);
   await deleteDoc(todoRef);
 };
 
